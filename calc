@@ -1,0 +1,193 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+)
+
+// Функция для выполнения арифметических операций с арабскими числами
+func calculateArabic(operator string, a, b int) (int, error) {
+	switch operator {
+	case "+":
+		return a + b, nil
+	case "-":
+		return a - b, nil
+	case "*":
+		return a * b, nil
+	case "/":
+		if b == 0 {
+			return 0, fmt.Errorf("Ошибка: деление на ноль.")
+		}
+		return a / b, nil
+	default:
+		return 0, fmt.Errorf("Ошибка: неподдерживаемая операция.")
+	}
+}
+
+// Функция для выполнения арифметических операций с римскими числами
+func calculateRoman(operator string, a, b string) (string, error) {
+	arabicA, err := romanToArabic(a)
+	if err != nil {
+		return "", err
+	}
+
+	arabicB, err := romanToArabic(b)
+	if err != nil {
+		return "", err
+	}
+
+	resultArabic, err := calculateArabic(operator, arabicA, arabicB)
+	if err != nil {
+		return "", err
+	}
+
+	return arabicToRoman(resultArabic)
+}
+
+// Функция для преобразования римских чисел в арабские
+func romanToArabic(romanNumeral string) (int, error) {
+	romanNumerals := map[rune]int{
+		'I': 1,
+		'V': 5,
+		'X': 10,
+		'L': 50,
+		'C': 100,
+		'D': 500,
+		'M': 1000,
+	}
+
+	var result int
+	prevValue := 0
+
+	for _, char := range romanNumeral {
+		value, found := romanNumerals[char]
+		if !found {
+			return 0, fmt.Errorf("Ошибка: неверный символ римской цифры.")
+		}
+
+		result += value
+		if prevValue < value {
+			result -= 2 * prevValue
+		}
+		prevValue = value
+	}
+
+	return result, nil
+}
+
+// Функция для преобразования арабских чисел в римские
+func arabicToRoman(arabicNumeral int) (string, error) {
+	if arabicNumeral <= 0 {
+		return "", fmt.Errorf("Ошибка: результат работы калькулятора с римскими числами не может быть меньше единицы.")
+	}
+
+	romanNumerals := map[int]string{
+		1000: "M",
+		900:  "CM",
+		500:  "D",
+		400:  "CD",
+		100:  "C",
+		90:   "XC",
+		50:   "L",
+		40:   "XL",
+		10:   "X",
+		9:    "IX",
+		5:    "V",
+		4:    "IV",
+		1:    "I",
+	}
+
+	var result strings.Builder
+
+	for value, numeral := range romanNumerals {
+		for arabicNumeral >= value {
+			result.WriteString(numeral)
+			arabicNumeral -= value
+		}
+	}
+
+	return result.String(), nil
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print("Введите выражение (или 'выход' для завершения): ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Ошибка при чтении ввода:", err)
+			return
+		}
+
+		// Удаляем символ новой строки из ввода
+		input = strings.TrimSpace(input)
+
+		// Проверяем условие выхода
+		if strings.ToLower(input) == "выход" {
+			fmt.Println("Выход из программы.")
+			return
+		}
+
+		// Используем регулярное выражение для разбора ввода
+		re := regexp.MustCompile(`(\d+|[IVXLCDM]+)\s*([+\-*/])\s*(\d+|[IVXLCDM]+)`)
+		matches := re.FindStringSubmatch(input)
+
+		if len(matches) != 4 {
+			fmt.Println("Ошибка: неверный формат ввода.")
+			continue
+		}
+
+		operand1 := matches[1]
+		operator := matches[2]
+		operand2 := matches[3]
+
+		// Проверяем, что операнды имеют правильный формат
+		if _, err := strconv.Atoi(operand1); err != nil && !isValidRomanNumeral(operand1) {
+			fmt.Println("Ошибка: неверный формат первого операнда.")
+			continue
+		}
+
+		if _, err := strconv.Atoi(operand2); err != nil && !isValidRomanNumeral(operand2) {
+			fmt.Println("Ошибка: неверный формат второго операнда.")
+			continue
+		}
+
+		// Выполняем операцию и выводим результат
+		if isValidRomanNumeral(operand1) && isValidRomanNumeral(operand2) {
+			result, err := calculateRoman(operator, operand1, operand2)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			fmt.Printf("Результат: %s\n", result)
+		} else {
+			// Парсим операнды как арабские числа
+			a, _ := strconv.Atoi(operand1)
+			b, _ := strconv.Atoi(operand2)
+
+			result, err := calculateArabic(operator, a, b)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			fmt.Printf("Результат: %d\n", result)
+		}
+	}
+}
+
+// Функция для проверки корректности римского числа
+func isValidRomanNumeral(s string) bool {
+	// Римское число должно состоять только из символов I, V, X, L, C, D, M
+	validChars := "IVXLCDM"
+	for _, char := range s {
+		if !strings.ContainsRune(validChars, char) {
+			return false
+		}
+	}
+	return true
+}
